@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Fruit Freshness Lab</title>
+
+<style>
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: "Poppins", "Segoe UI", sans-serif;
+    background: radial-gradient(circle at top, #0f172a, #020617);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #e5e7eb;
+}
+
+/* ===== CARD ===== */
+.card {
+    width: 420px;
+    padding: 32px 28px;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(18px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 0 40px rgba(99, 102, 241, 0.25);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+    transition: all 0.4s ease;
+}
+
+/* Fresh glow */
+.card.fresh {
+    box-shadow: 0 0 45px rgba(34, 197, 94, 0.9);
+}
+
+/* Avoid / Rotten glow */
+.card.avoid {
+    box-shadow: 0 0 45px rgba(239, 68, 68, 0.9);
+}
+
+/* ===== HEADER ===== */
+.header h1 {
+    margin: 0;
+    font-size: 24px;
+    background: linear-gradient(90deg, #22d3ee, #818cf8, #f472b6);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+/* ===== UPLOAD ===== */
+.file-box {
+    width: 100%;
+    border: 2px dashed rgba(129, 140, 248, 0.6);
+    padding: 20px;
+    border-radius: 14px;
+    text-align: center;
+    cursor: pointer;
+}
+
+.file-box:hover {
+    background: rgba(129, 140, 248, 0.08);
+}
+
+input[type="file"] {
+    display: none;
+}
+
+/* ===== BUTTON ===== */
+button {
+    width: 100%;
+    padding: 14px;
+    border-radius: 14px;
+    border: none;
+    font-size: 15px;
+    font-weight: 500;
+    color: white;
+    background: linear-gradient(90deg, #6366f1, #22d3ee);
+    cursor: pointer;
+}
+
+/* ===== IMAGE ===== */
+.preview-container img {
+    display: none;
+    width: 100%;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+/* ===== RESULT ===== */
+.result {
+    width: 100%;
+    padding: 16px;
+    border-radius: 14px;
+    background: rgba(2, 6, 23, 0.6);
+    text-align: center;
+}
+
+/* ===== PROGRESS BAR ===== */
+.progress-bar {
+    width: 100%;
+    height: 10px;
+    background: #020617;
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    width: 0%;
+    transition: width 0.8s ease;
+}
+
+.progress-fill.fresh {
+    background: linear-gradient(90deg, #22c55e, #4ade80);
+}
+
+.progress-fill.avoid {
+    background: linear-gradient(90deg, #ef4444, #f87171);
+}
+
+.loading {
+    color: #22d3ee;
+}
+</style>
+</head>
+
+<body>
+
+<div class="card" id="card">
+
+    <div class="header">
+        <h1>Fruit Freshness Lab</h1>
+    </div>
+
+    <!-- Upload text stays constant -->
+    <label class="file-box"  id="uploadBox">
+        📤 Upload Fruit Image
+        <input type="file" id="imageInput" accept="image/*">
+    </label>
+
+    <button onclick="uploadImage()">Run Analysis</button>
+
+    <div class="preview-container">
+        <img id="preview">
+    </div>
+
+    <div class="result" id="result">
+        Awaiting image upload...
+    </div>
+
+    <div class="progress-bar">
+        <div class="progress-fill" id="progressFill"></div>
+    </div>
+
+</div>
+
+<script>
+const imageInput = document.getElementById("imageInput");
+const uploadBox = document.getElementById("uploadBox");
+const result = document.getElementById("result");
+
+// 🔹 Change text when image is uploaded
+imageInput.addEventListener("change", () => {
+    if (imageInput.files.length) {
+        uploadBox.appendChild(imageInput);
+        result.textContent = "✅ Image uploaded. Ready for analysis.";
+    }
+});
+
+
+async function uploadImage() {
+    const imageInput = document.getElementById("imageInput");
+    const preview = document.getElementById("preview");
+    const result = document.getElementById("result");
+    const progressFill = document.getElementById("progressFill");
+    const card = document.getElementById("card");
+
+    if (!imageInput.files.length) {
+        alert("Please upload an image");
+        return;
+    }
+
+    preview.src = URL.createObjectURL(imageInput.files[0]);
+    preview.style.display = "block";
+
+    const formData = new FormData();
+    formData.append("file", imageInput.files[0]);
+
+    // Reset UI
+    card.className = "card";
+    result.className = "result loading";
+    result.textContent = "🧠 AI is analyzing...";
+    progressFill.style.width = "0%";
+
+    try {
+        const response = await fetch("http://127.0.0.1:8000/predict", {
+            method: "POST",
+            body: formData
+        });
+
+        const data = await response.json();
+
+        // Rotten probability (0–100)
+        const rottenPercent = Math.round(
+            Math.max(0, Math.min(1, data.rotten_probability)) * 100
+        );
+
+        // Fresh confidence
+        const confidence = 100 - rottenPercent;
+
+        let status, stateClass;
+
+        if (confidence >= 90) {
+            status = "Fresh";
+            stateClass = "fresh";
+        } else {
+            status = "Avoid";
+            stateClass = "avoid";
+        }
+
+        card.classList.add(stateClass);
+
+        progressFill.className = "progress-fill " + stateClass;
+        progressFill.style.width = confidence + "%";
+
+        result.className = "result";
+        result.innerHTML = `
+            <strong>Status:</strong> ${status}<br>
+            <strong>Confidence:</strong> ${confidence}%<br>
+            <small>Rotten Probability: ${rottenPercent}%</small>
+        `;
+
+    } catch (error) {
+        result.className = "result";
+        result.textContent = "❌ Server connection failed";
+    }
+}
+</script>
+
+</body>
+</html>
